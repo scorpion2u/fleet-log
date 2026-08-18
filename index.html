@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Fleet Log</title>
+<style>
+  :root{
+    --bg:#f2f2f7;
+    --grouped-bg:#ffffff;
+    --card:#ffffff;
+    --card-2:#e9e9ee;
+    --sep:#d1d1d6;
+    --label:#000000;
+    --secondary-label:#6e6e73;
+    --tertiary-label:#a1a1a6;
+    --blue:#007aff;
+    --red:#ff3b30;
+    --green:#34c759;
+    --yellow:#ffcc00;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--label);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    padding-bottom:env(safe-area-inset-bottom, 24px);
+    -webkit-font-smoothing:antialiased;
+  }
+  .scroller{
+    max-width:600px;
+    margin:0 auto;
+    padding:0 16px;
+  }
+
+  /* Large title header, iOS nav-bar style */
+  .navbar{
+    position:sticky;
+    top:0;
+    z-index:10;
+    background:rgba(242,242,247,0.82);
+    backdrop-filter:blur(20px);
+    -webkit-backdrop-filter:blur(20px);
+    padding-top:env(safe-area-inset-top, 12px);
+  }
+  .navbar-inner{
+    max-width:600px;
+    margin:0 auto;
+    padding:6px 16px 12px;
+  }
+  .eyebrow{
+    font-size:13px;
+    color:var(--secondary-label);
+    font-weight:500;
+    margin-bottom:2px;
+  }
+  h1{
+    font-size:34px;
+    font-weight:700;
+    letter-spacing:-0.4px;
+    margin:0;
+  }
+
+  /* iOS section header caption */
+  .section-header{
+    font-size:13px;
+    font-weight:590;
+    text-transform:uppercase;
+    letter-spacing:0.2px;
+    color:var(--secondary-label);
+    padding:20px 16px 6px 20px;
+  }
+  .section-footer{
+    font-size:13px;
+    color:var(--secondary-label);
+    padding:6px 20px 4px;
+    line-height:1.35;
+  }
+
+  /* Grouped inset card */
+  .group{
+    background:var(--card);
+    border-radius:12px;
+    overflow:hidden;
+  }
+  .row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:12px 16px;
+    min-height:46px;
+    border-bottom:0.5px solid var(--sep);
+    gap:12px;
+  }
+  .row:last-child{border-bottom:none;}
+
+  .plate-badge{
+    font-variant-numeric:tabular-nums;
+    font-weight:700;
+    font-size:14px;
+    letter-spacing:0.5px;
+    color:#000;
+    background:var(--yellow);
+    padding:5px 9px;
+    border-radius:6px;
+    white-space:nowrap;
+  }
+  .row-left{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    min-width:0;
+  }
+  .row-title{
+    font-size:17px;
+    font-weight:400;
+    color:var(--label);
+  }
+  .row-caption{
+    font-size:13px;
+    color:var(--secondary-label);
+    margin-top:1px;
+  }
+
+  /* iOS-style value picker (select styled as native row control) */
+  .value-select{
+    -webkit-appearance:none;
+    appearance:none;
+    background:none;
+    border:none;
+    color:var(--secondary-label);
+    font-size:17px;
+    font-family:inherit;
+    text-align:right;
+    padding-right:16px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='13'><path d='M1 1l5 5.5L1 12' fill='none' stroke='%23636366' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;
+    background-position:right 0 center;
+    max-width:150px;
+  }
+  .value-select.assigned{color:var(--blue);}
+  .value-select:focus{outline:none;}
+
+  .datebar-group{
+    margin-top:16px;
+  }
+  input[type=date]{
+    -webkit-appearance:none;
+    appearance:none;
+    background:none;
+    border:none;
+    color:var(--blue);
+    font-size:17px;
+    font-family:inherit;
+    text-align:right;
+    color-scheme:light;
+  }
+  .today-chip{
+    background:var(--card-2);
+    color:var(--blue);
+    border:none;
+    font-size:15px;
+    font-weight:500;
+    padding:6px 12px;
+    border-radius:8px;
+  }
+  .today-chip:active{opacity:0.6;}
+
+  /* Big filled action button */
+  .action-btn{
+    width:100%;
+    background:var(--blue);
+    color:#fff;
+    border:none;
+    font-size:17px;
+    font-weight:590;
+    padding:14px;
+    border-radius:12px;
+    margin-top:16px;
+    cursor:pointer;
+  }
+  .action-btn:active{opacity:0.7;}
+  .save-status{
+    text-align:center;
+    font-size:13px;
+    color:var(--green);
+    margin-top:8px;
+    min-height:16px;
+  }
+  .save-status.err{color:var(--red);}
+
+  /* Segmented control for filters */
+  .segmented{
+    display:flex;
+    background:var(--card-2);
+    border-radius:9px;
+    padding:2px;
+    gap:2px;
+    margin:12px 0 4px;
+  }
+  .segmented select{
+    flex:1;
+    -webkit-appearance:none;
+    appearance:none;
+    background:none;
+    border:none;
+    color:var(--label);
+    font-size:13px;
+    font-family:inherit;
+    text-align:center;
+    padding:6px 4px;
+    border-radius:7px;
+  }
+  .segmented select:focus{outline:none; background:rgba(255,255,255,0.06);}
+
+  .fine-filter-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:12px 16px;
+  }
+  /* iOS switch */
+  .switch{
+    position:relative;
+    width:51px;
+    height:31px;
+    flex-shrink:0;
+  }
+  .switch input{opacity:0; width:0; height:0;}
+  .switch .track{
+    position:absolute; inset:0;
+    background:var(--card-2);
+    border-radius:16px;
+    transition:background .2s;
+  }
+  .switch .thumb{
+    position:absolute;
+    top:2px; left:2px;
+    width:27px; height:27px;
+    background:#fff;
+    border-radius:50%;
+    box-shadow:0 3px 8px rgba(0,0,0,0.4);
+    transition:transform .2s;
+  }
+  .switch input:checked + .track{background:var(--green);}
+  .switch input:checked + .track + .thumb{transform:translateX(20px);}
+
+  .fine-pill{
+    font-size:13px;
+    font-weight:590;
+    padding:5px 10px;
+    border-radius:8px;
+    border:none;
+  }
+  .fine-pill.off{
+    background:var(--card-2);
+    color:var(--secondary-label);
+  }
+  .fine-pill.on{
+    background:rgba(255,69,58,0.16);
+    color:var(--red);
+  }
+  .fine-pill:active{opacity:0.6;}
+
+  .note-input{
+    width:100%;
+    background:var(--card-2);
+    border:none;
+    color:var(--label);
+    font-size:15px;
+    font-family:inherit;
+    padding:9px 10px;
+    border-radius:8px;
+    margin-top:8px;
+  }
+  .note-input::placeholder{color:var(--tertiary-label);}
+
+  .history-row{
+    display:flex;
+    flex-direction:column;
+    padding:12px 16px;
+    border-bottom:0.5px solid var(--sep);
+    gap:6px;
+  }
+  .history-row:last-child{border-bottom:none;}
+  .history-top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .history-meta{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    min-width:0;
+  }
+  .history-date{
+    font-size:13px;
+    color:var(--secondary-label);
+  }
+  .history-main{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:17px;
+  }
+
+  .empty-state{
+    padding:32px 16px;
+    text-align:center;
+    color:var(--secondary-label);
+    font-size:15px;
+    background:var(--card);
+    border-radius:12px;
+  }
+  .loading{
+    padding:24px 16px;
+    text-align:center;
+    color:var(--secondary-label);
+    font-size:15px;
+  }
+</style>
+</head>
+<body>
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="eyebrow">4 lorries · 4 drivers</div>
+    <h1>Fleet Log</h1>
+  </div>
+</div>
+
+<div class="scroller">
+
+  <div class="datebar-group">
+    <div class="group">
+      <div class="row">
+        <div class="row-title">Date</div>
+        <input type="date" id="dateInput">
+      </div>
+      <div class="row">
+        <div class="row-title">Quick jump</div>
+        <button class="today-chip" id="todayBtn">Today</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-header" id="assignSectionHeader">Today's Assignments</div>
+  <div class="group" id="plateGroup"></div>
+  <div class="section-footer">Pick who's driving each lorry today. Tap Save when done.</div>
+
+  <button class="action-btn" id="saveBtn">Save This Day</button>
+  <div class="save-status" id="saveStatus"></div>
+
+  <div class="section-header">Log Book</div>
+  <div class="group" style="margin-bottom:10px;">
+    <div class="segmented">
+      <select id="filterPlate"><option value="">All lorries</option></select>
+      <select id="filterDriver"><option value="">All drivers</option></select>
+    </div>
+    <div class="fine-filter-row">
+      <span class="row-title" style="font-size:15px;">Fines only</span>
+      <label class="switch">
+        <input type="checkbox" id="filterFineOnly">
+        <span class="track"></span>
+        <span class="thumb"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="group" id="historyGroup">
+    <div class="loading">Loading log…</div>
+  </div>
+  <div class="section-footer">Tap "Flag fine" on an entry to mark it and add a note — useful for tracing who was driving when a ticket comes in.</div>
+
+</div>
+
+<script>
+const PLATES = ["GBH 218 Z","YR 1868 R","YR 1859 S","YR 2284 T"];
+const DRIVERS = ["Kumar","Seng","Lim","Vetri"];
+const STORAGE_KEY = "fleet-data";
+let data = { logs:{}, fines:{} };
+
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+
+async function loadData(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      data = { logs: parsed.logs || {}, fines: parsed.fines || {} };
+    }
+  }catch(e){ console.error("Fleet Log: couldn't read saved data", e); }
+}
+
+async function persist(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    return true;
+  }catch(e){
+    console.error("Fleet Log: couldn't save", e);
+    return false;
+  }
+}
+
+function driverOptionsHTML(selected, takenByOthers){
+  let html = `<option value="">Not assigned</option>`;
+  DRIVERS.forEach(d=>{
+    const isTaken = takenByOthers.has(d) && d !== selected;
+    html += `<option value="${d}" ${d===selected?"selected":""} ${isTaken?"disabled":""}>${d}${isTaken ? " — already assigned today" : ""}</option>`;
+  });
+  return html;
+}
+
+function refreshPlateOptions(){
+  const selects = Array.from(document.querySelectorAll("#plateGroup .value-select"));
+  selects.forEach(sel=>{
+    const others = selects.filter(s=>s!==sel).map(s=>s.value).filter(Boolean);
+    const takenByOthers = new Set(others);
+    const current = sel.value;
+    sel.innerHTML = driverOptionsHTML(current, takenByOthers);
+  });
+}
+
+function renderPlateGroup(){
+  const dateVal = document.getElementById("dateInput").value;
+  const dayLog = data.logs[dateVal] || {};
+  const group = document.getElementById("plateGroup");
+  group.innerHTML = "";
+  PLATES.forEach(plate=>{
+    const assigned = dayLog[plate] || "";
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `
+      <div class="row-left">
+        <span class="plate-badge">${plate}</span>
+      </div>
+      <select class="value-select ${assigned ? "assigned" : ""}" data-plate="${plate}">${driverOptionsHTML(assigned, new Set())}</select>
+    `;
+    group.appendChild(row);
+  });
+  refreshPlateOptions();
+  document.getElementById("saveStatus").textContent = "";
+
+  const dHeader = document.getElementById("assignSectionHeader");
+  dHeader.textContent = dateVal === todayStr() ? "Today's Assignments" : "Assignments for " + dateVal;
+}
+
+document.getElementById("plateGroup").addEventListener("change", (e)=>{
+  if(e.target.classList.contains("value-select")){
+    e.target.classList.toggle("assigned", !!e.target.value);
+    refreshPlateOptions();
+  }
+});
+
+async function saveDay(){
+  const dateVal = document.getElementById("dateInput").value;
+  if(!dateVal) return;
+  const status = document.getElementById("saveStatus");
+  const selects = document.querySelectorAll("#plateGroup .value-select");
+  const entry = {};
+  const seen = new Set();
+  let duplicate = null;
+  selects.forEach(s=>{
+    if(!s.value) return;
+    entry[s.dataset.plate] = s.value;
+    if(seen.has(s.value)) duplicate = s.value;
+    seen.add(s.value);
+  });
+  if(duplicate){
+    status.textContent = `${duplicate} is on two lorries at once — fix that before saving`;
+    status.className = "save-status err";
+    return;
+  }
+  const previousEntry = data.logs[dateVal];
+  data.logs[dateVal] = entry;
+  status.textContent = "Saving…";
+  status.className = "save-status";
+  const ok = await persist();
+  if(ok){
+    status.textContent = `Saved for ${dateVal}`;
+    status.className = "save-status";
+  }else{
+    if(previousEntry === undefined) delete data.logs[dateVal];
+    else data.logs[dateVal] = previousEntry;
+    status.textContent = "Couldn't save — check your connection and try again";
+    status.className = "save-status err";
+  }
+  renderHistory();
+}
+
+function fineKey(date, plate){ return date + "|" + plate; }
+
+function buildHistoryRows(){
+  const rows = [];
+  Object.keys(data.logs).sort().reverse().forEach(date=>{
+    const dayLog = data.logs[date];
+    PLATES.forEach(plate=>{
+      const driver = dayLog[plate];
+      if(!driver) return;
+      const fk = fineKey(date, plate);
+      const fine = data.fines[fk];
+      rows.push({date, plate, driver, fined: !!fine, note: fine ? fine.note : ""});
+    });
+  });
+  return rows;
+}
+
+function renderHistory(){
+  const rows = buildHistoryRows();
+  const plateFilter = document.getElementById("filterPlate").value;
+  const driverFilter = document.getElementById("filterDriver").value;
+  const fineOnly = document.getElementById("filterFineOnly").checked;
+
+  const filtered = rows.filter(r=>{
+    if(plateFilter && r.plate !== plateFilter) return false;
+    if(driverFilter && r.driver !== driverFilter) return false;
+    if(fineOnly && !r.fined) return false;
+    return true;
+  });
+
+  const group = document.getElementById("historyGroup");
+  if(filtered.length === 0){
+    group.innerHTML = `<div class="empty-state">No entries match.<br>Save a day above to start the log.</div>`;
+    return;
+  }
+
+  let html = "";
+  filtered.forEach(r=>{
+    html += `<div class="history-row" data-date="${r.date}" data-plate="${r.plate}">
+      <div class="history-top">
+        <div class="history-meta">
+          <span class="history-date">${r.date}</span>
+          <span class="history-main"><span class="plate-badge">${r.plate}</span> ${r.driver}</span>
+        </div>
+        <button class="fine-pill ${r.fined ? "on" : "off"}" data-action="toggle-fine">${r.fined ? "Flagged" : "Flag fine"}</button>
+      </div>
+      ${r.fined ? `<input type="text" class="note-input" data-action="note" placeholder="Note — offence, amount…" value="${(r.note||"").replace(/"/g,'&quot;')}">` : ""}
+    </div>`;
+  });
+  group.innerHTML = html;
+}
+
+document.getElementById("historyGroup").addEventListener("click", async (e)=>{
+  if(e.target.dataset.action === "toggle-fine"){
+    const row = e.target.closest(".history-row");
+    const fk = fineKey(row.dataset.date, row.dataset.plate);
+    const hadFine = !!data.fines[fk];
+    if(hadFine) delete data.fines[fk];
+    else data.fines[fk] = { note: "" };
+    const ok = await persist();
+    if(!ok){
+      if(hadFine) data.fines[fk] = { note: "" }; else delete data.fines[fk];
+      showToast("Couldn't save — check your connection and try again");
+    }
+    renderHistory();
+  }
+});
+
+document.getElementById("historyGroup").addEventListener("change", async (e)=>{
+  if(e.target.dataset.action === "note"){
+    const row = e.target.closest(".history-row");
+    const fk = fineKey(row.dataset.date, row.dataset.plate);
+    if(data.fines[fk]){
+      const previousNote = data.fines[fk].note;
+      data.fines[fk].note = e.target.value;
+      const ok = await persist();
+      if(!ok){
+        data.fines[fk].note = previousNote;
+        e.target.value = previousNote;
+        showToast("Couldn't save the note — check your connection and try again");
+      }
+    }
+  }
+});
+
+function showToast(msg){
+  let toast = document.getElementById("toast");
+  if(!toast){
+    toast = document.createElement("div");
+    toast.id = "toast";
+    toast.style.cssText = "position:fixed;left:16px;right:16px;bottom:24px;max-width:568px;margin:0 auto;background:#1c1c1e;color:#fff;font-size:14px;padding:12px 16px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.25);z-index:50;text-align:center;transition:opacity .3s;";
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.opacity = "1";
+  clearTimeout(toast._hideTimer);
+  toast._hideTimer = setTimeout(()=>{ toast.style.opacity = "0"; }, 3000);
+}
+
+function populateFilters(){
+  const fp = document.getElementById("filterPlate");
+  PLATES.forEach(p=>{
+    const opt = document.createElement("option");
+    opt.value = p; opt.textContent = p;
+    fp.appendChild(opt);
+  });
+  const fd = document.getElementById("filterDriver");
+  DRIVERS.forEach(d=>{
+    const opt = document.createElement("option");
+    opt.value = d; opt.textContent = d;
+    fd.appendChild(opt);
+  });
+}
+
+document.getElementById("saveBtn").addEventListener("click", saveDay);
+document.getElementById("dateInput").addEventListener("change", renderPlateGroup);
+document.getElementById("todayBtn").addEventListener("click", ()=>{
+  document.getElementById("dateInput").value = todayStr();
+  renderPlateGroup();
+});
+["filterPlate","filterDriver","filterFineOnly"].forEach(id=>{
+  document.getElementById(id).addEventListener("change", renderHistory);
+});
+
+(async function init(){
+  document.getElementById("dateInput").value = todayStr();
+  populateFilters();
+  await loadData();
+  renderPlateGroup();
+  renderHistory();
+})();
+</script>
+</body>
+</html>
