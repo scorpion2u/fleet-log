@@ -1,10 +1,13 @@
-const CACHE_NAME = "fleet-log-shell-v1";
+const CACHE_NAME = "fleet-log-shell-v5";
 const SHELL_FILES = [
   "./",
   "./index.html",
+  "./driver-view.html",
   "./manifest.json",
+  "./manifest-driver.json",
   "./icon-192.png",
-  "./icon-512.png"
+  "./icon-512.png",
+  "./apple-touch-icon.png"
 ];
 
 self.addEventListener("install", (event) => {
