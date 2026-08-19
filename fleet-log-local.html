@@ -407,6 +407,126 @@
     background-position:right 0 center;
   }
   .history-driver-select:focus{outline:none;}
+
+  .date-btn{
+    background:none;
+    border:none;
+    color:var(--blue);
+    font-size:17px;
+    font-family:inherit;
+  }
+  .date-btn:active{opacity:0.6;}
+
+  .value-select-btn{
+    background:none;
+    border:none;
+    color:var(--secondary-label);
+    font-size:17px;
+    font-family:inherit;
+    display:flex;
+    align-items:center;
+    gap:5px;
+  }
+  .value-select-btn.assigned{color:var(--blue);}
+  .value-select-btn:active{opacity:0.6;}
+
+  .history-driver-btn{
+    background:none;
+    border:none;
+    color:var(--label);
+    font-size:17px;
+    font-family:inherit;
+    display:flex;
+    align-items:center;
+    gap:4px;
+  }
+  .history-driver-btn:active{opacity:0.6;}
+
+  .dp-option{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    text-align:left;
+    color:var(--label);
+  }
+  .dp-option .dp-option-sub{
+    display:block;
+    font-size:12px;
+    color:var(--tertiary-label);
+    margin-top:2px;
+  }
+  .dp-option.is-selected{color:var(--blue); font-weight:590;}
+  .dp-option.is-disabled{color:var(--tertiary-label);}
+  .dp-check{color:var(--blue); font-size:17px; font-weight:700;}
+
+  .date-picker-card{
+    position:fixed;
+    left:20px; right:20px;
+    top:50%;
+    transform:translateY(-50%);
+    z-index:61;
+    background:#fff;
+    border-radius:16px;
+    padding:16px;
+    max-width:360px;
+    margin:0 auto;
+    box-shadow:0 10px 40px rgba(0,0,0,0.3);
+  }
+  .dp-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:14px;
+  }
+  .dp-header button{
+    width:32px; height:32px;
+    border-radius:50%;
+    border:none;
+    background:var(--card-2);
+    color:var(--blue);
+    font-size:18px;
+    line-height:1;
+  }
+  .dp-header button:active{opacity:0.6;}
+  .dp-month-label{font-size:17px; font-weight:600;}
+  .dp-weekdays{
+    display:grid;
+    grid-template-columns:repeat(7,1fr);
+    text-align:center;
+    font-size:12px;
+    color:var(--secondary-label);
+    margin-bottom:6px;
+  }
+  .dp-grid{
+    display:grid;
+    grid-template-columns:repeat(7,1fr);
+    gap:2px;
+  }
+  .dp-cell{
+    aspect-ratio:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:50%;
+    font-size:15px;
+    border:none;
+    background:none;
+    color:var(--label);
+  }
+  .dp-cell.today{border:1.5px solid var(--blue);}
+  .dp-cell.selected{background:var(--blue); color:#fff; font-weight:600;}
+  .dp-cell.empty{visibility:hidden;}
+  .dp-footer{margin-top:14px;}
+  .dp-footer button{
+    width:100%;
+    background:var(--card-2);
+    border:none;
+    color:var(--blue);
+    font-size:15px;
+    font-weight:590;
+    padding:11px;
+    border-radius:10px;
+  }
 </style>
 </head>
 <body>
@@ -430,7 +550,7 @@
     <div class="group">
       <div class="row">
         <div class="row-title">Date</div>
-        <input type="date" id="dateInput">
+        <button type="button" class="date-btn" id="dateBtn">2026/08/19</button>
       </div>
       <div class="row">
         <div class="row-title">Quick jump</div>
@@ -483,6 +603,26 @@
 </div>
 <input type="file" id="importFileInput" accept="application/json" style="display:none;">
 
+<div class="sheet-backdrop" id="driverPickerBackdrop" style="display:none;"></div>
+<div class="action-sheet" id="driverPickerSheet" style="display:none;">
+  <div class="sheet-group" id="driverPickerList"></div>
+  <div class="sheet-group">
+    <button class="sheet-btn" id="driverPickerCancelBtn" style="text-align:center; font-weight:590;">Cancel</button>
+  </div>
+</div>
+
+<div class="sheet-backdrop" id="datePickerBackdrop" style="display:none;"></div>
+<div class="date-picker-card" id="datePickerCard" style="display:none;">
+  <div class="dp-header">
+    <button type="button" id="dpPrevBtn" aria-label="Previous month">‹</button>
+    <span class="dp-month-label" id="dpMonthLabel"></span>
+    <button type="button" id="dpNextBtn" aria-label="Next month">›</button>
+  </div>
+  <div class="dp-weekdays"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div>
+  <div class="dp-grid" id="dpGrid"></div>
+  <div class="dp-footer"><button type="button" id="dpCancelBtn">Cancel</button></div>
+</div>
+
 <script>
 const PLATES = ["GBH 218 Z","YR 1868 R","YR 1859 S","YR 2284 T"];
 const DRIVERS = ["Kumar","Seng","Lim","Vetri"];
@@ -514,69 +654,178 @@ async function persist(){
   }
 }
 
-function driverOptionsHTML(selected, takenByOthers){
-  let html = `<option value="">Not assigned</option>`;
-  DRIVERS.forEach(d=>{
-    const isTaken = takenByOthers.has(d) && d !== selected;
-    html += `<option value="${d}" ${d===selected?"selected":""} ${isTaken?"disabled":""}>${d}${isTaken ? " — already assigned today" : ""}</option>`;
-  });
-  return html;
+function formatDateDisplay(d){
+  return d.replaceAll("-", "/");
 }
 
-function refreshPlateOptions(){
-  const selects = Array.from(document.querySelectorAll("#plateGroup .value-select"));
-  selects.forEach(sel=>{
-    const others = selects.filter(s=>s!==sel).map(s=>s.value).filter(Boolean);
-    const takenByOthers = new Set(others);
-    const current = sel.value;
-    sel.innerHTML = driverOptionsHTML(current, takenByOthers);
+let selectedDate = todayStr();
+function getSelectedDate(){ return selectedDate; }
+function setSelectedDate(d){
+  selectedDate = d;
+  document.getElementById("dateBtn").textContent = formatDateDisplay(d);
+  renderPlateGroup();
+}
+
+let draftAssignment = {};
+
+/* ---------- custom driver picker sheet (replaces native <select>) ---------- */
+
+function openDriverPicker({ selected, disabledDrivers, includeUnassigned, onPick }){
+  if(includeUnassigned === undefined) includeUnassigned = true;
+  disabledDrivers = disabledDrivers || new Set();
+  const listEl = document.getElementById("driverPickerList");
+  let html = "";
+  if(includeUnassigned){
+    html += `<button type="button" class="sheet-btn dp-option ${!selected?"is-selected":""}" data-value="">
+      <span>Not assigned</span>${!selected ? `<span class="dp-check">✓</span>` : ""}
+    </button>`;
+  }
+  DRIVERS.forEach(d=>{
+    const disabled = disabledDrivers.has(d) && d !== selected;
+    html += `<button type="button" class="sheet-btn dp-option ${disabled?"is-disabled":""} ${d===selected?"is-selected":""}" data-value="${d}" ${disabled?"disabled":""}>
+      <span>${d}${disabled ? `<span class="dp-option-sub">Already assigned today</span>` : ""}</span>${d===selected ? `<span class="dp-check">✓</span>` : ""}
+    </button>`;
   });
+  listEl.innerHTML = html;
+  listEl.querySelectorAll(".dp-option:not(.is-disabled)").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      closeDriverPicker();
+      onPick(btn.dataset.value);
+    });
+  });
+  document.getElementById("driverPickerBackdrop").style.display = "block";
+  document.getElementById("driverPickerSheet").style.display = "flex";
+}
+function closeDriverPicker(){
+  document.getElementById("driverPickerBackdrop").style.display = "none";
+  document.getElementById("driverPickerSheet").style.display = "none";
+}
+document.getElementById("driverPickerBackdrop").addEventListener("click", closeDriverPicker);
+document.getElementById("driverPickerCancelBtn").addEventListener("click", closeDriverPicker);
+
+/* ---------- custom calendar date picker (replaces native <input type=date>) ---------- */
+
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+let dpViewYear, dpViewMonth;
+
+function openDatePicker(){
+  const [y,m] = getSelectedDate().split("-").map(Number);
+  dpViewYear = y; dpViewMonth = m-1;
+  renderDatePicker();
+  document.getElementById("datePickerBackdrop").style.display = "block";
+  document.getElementById("datePickerCard").style.display = "block";
+}
+function closeDatePicker(){
+  document.getElementById("datePickerBackdrop").style.display = "none";
+  document.getElementById("datePickerCard").style.display = "none";
+}
+function renderDatePicker(){
+  document.getElementById("dpMonthLabel").textContent = `${MONTH_NAMES[dpViewMonth]} ${dpViewYear}`;
+  const grid = document.getElementById("dpGrid");
+  grid.innerHTML = "";
+  const firstDay = new Date(dpViewYear, dpViewMonth, 1).getDay();
+  const daysInMonth = new Date(dpViewYear, dpViewMonth+1, 0).getDate();
+  const todayVal = todayStr();
+  const selected = getSelectedDate();
+  for(let i=0;i<firstDay;i++){
+    const empty = document.createElement("div");
+    empty.className = "dp-cell empty";
+    grid.appendChild(empty);
+  }
+  for(let day=1; day<=daysInMonth; day++){
+    const dateStr = `${dpViewYear}-${String(dpViewMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+    const cell = document.createElement("button");
+    cell.type = "button";
+    cell.className = "dp-cell";
+    if(dateStr === todayVal) cell.classList.add("today");
+    if(dateStr === selected) cell.classList.add("selected");
+    cell.textContent = day;
+    cell.addEventListener("click", ()=>{
+      setSelectedDate(dateStr);
+      closeDatePicker();
+    });
+    grid.appendChild(cell);
+  }
+}
+document.getElementById("dpPrevBtn").addEventListener("click", ()=>{
+  dpViewMonth--; if(dpViewMonth<0){ dpViewMonth=11; dpViewYear--; }
+  renderDatePicker();
+});
+document.getElementById("dpNextBtn").addEventListener("click", ()=>{
+  dpViewMonth++; if(dpViewMonth>11){ dpViewMonth=0; dpViewYear++; }
+  renderDatePicker();
+});
+document.getElementById("dpCancelBtn").addEventListener("click", closeDatePicker);
+document.getElementById("datePickerBackdrop").addEventListener("click", closeDatePicker);
+document.getElementById("dateBtn").addEventListener("click", openDatePicker);
+
+/* ---------- assignment grid ---------- */
+
+function updatePlateButton(plate){
+  const btn = document.querySelector(`.value-select-btn[data-plate="${plate}"]`);
+  if(!btn) return;
+  const val = draftAssignment[plate] || "";
+  btn.querySelector(".vsb-label").textContent = val || "Not assigned";
+  btn.classList.toggle("assigned", !!val);
 }
 
 function renderPlateGroup(){
-  const dateVal = document.getElementById("dateInput").value;
+  const dateVal = getSelectedDate();
   const dayLog = data.logs[dateVal] || {};
+  draftAssignment = { ...dayLog };
   const group = document.getElementById("plateGroup");
   group.innerHTML = "";
   PLATES.forEach(plate=>{
-    const assigned = dayLog[plate] || "";
+    const assigned = draftAssignment[plate] || "";
     const row = document.createElement("div");
     row.className = "row";
     row.innerHTML = `
       <div class="row-left">
         <span class="plate-badge">${plate}</span>
       </div>
-      <select class="value-select ${assigned ? "assigned" : ""}" data-plate="${plate}">${driverOptionsHTML(assigned, new Set())}</select>
+      <button type="button" class="value-select-btn ${assigned ? "assigned" : ""}" data-plate="${plate}">
+        <span class="vsb-label">${assigned || "Not assigned"}</span>
+        <svg width="8" height="13" viewBox="0 0 8 13" fill="none"><path d="M1 1l5 5.5L1 12" stroke="#636366" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
     `;
     group.appendChild(row);
   });
-  refreshPlateOptions();
   document.getElementById("saveStatus").textContent = "";
 
   const dHeader = document.getElementById("assignSectionHeader");
   dHeader.textContent = dateVal === todayStr() ? "Today's Assignments" : "Assignments for " + dateVal;
 }
 
-document.getElementById("plateGroup").addEventListener("change", (e)=>{
-  if(e.target.classList.contains("value-select")){
-    e.target.classList.toggle("assigned", !!e.target.value);
-    refreshPlateOptions();
-  }
+document.getElementById("plateGroup").addEventListener("click", (e)=>{
+  const btn = e.target.closest(".value-select-btn");
+  if(!btn) return;
+  const plate = btn.dataset.plate;
+  const disabled = new Set(
+    Object.keys(draftAssignment).filter(p=>p!==plate).map(p=>draftAssignment[p]).filter(Boolean)
+  );
+  openDriverPicker({
+    selected: draftAssignment[plate] || "",
+    disabledDrivers: disabled,
+    onPick: (value)=>{
+      if(value) draftAssignment[plate] = value;
+      else delete draftAssignment[plate];
+      updatePlateButton(plate);
+    }
+  });
 });
 
 async function saveDay(){
-  const dateVal = document.getElementById("dateInput").value;
-  if(!dateVal) return;
+  const dateVal = getSelectedDate();
   const status = document.getElementById("saveStatus");
-  const selects = document.querySelectorAll("#plateGroup .value-select");
   const entry = {};
   const seen = new Set();
   let duplicate = null;
-  selects.forEach(s=>{
-    if(!s.value) return;
-    entry[s.dataset.plate] = s.value;
-    if(seen.has(s.value)) duplicate = s.value;
-    seen.add(s.value);
+  Object.keys(draftAssignment).forEach(plate=>{
+    const driver = draftAssignment[plate];
+    if(!driver) return;
+    entry[plate] = driver;
+    if(seen.has(driver)) duplicate = driver;
+    seen.add(driver);
   });
   if(duplicate){
     status.textContent = `${duplicate} is on two lorries at once — fix that before saving`;
@@ -638,13 +887,14 @@ function renderHistory(){
 
   let html = "";
   filtered.forEach(r=>{
-    const driverOpts = DRIVERS.map(d=>`<option value="${d}" ${d===r.driver?"selected":""}>${d}</option>`).join("");
     html += `<div class="history-row" data-date="${r.date}" data-plate="${r.plate}">
       <div class="history-top">
         <div class="history-meta">
           <span class="history-date">${r.date}</span>
           <span class="history-main"><span class="plate-badge">${r.plate}</span>
-            <select class="history-driver-select" data-action="reassign">${driverOpts}</select>
+            <button type="button" class="history-driver-btn" data-action="reassign">${r.driver}
+              <svg width="8" height="13" viewBox="0 0 8 13" fill="none"><path d="M1 1l5 5.5L1 12" stroke="#636366" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
           </span>
         </div>
         <div class="row-actions">
@@ -701,9 +951,37 @@ document.getElementById("historyGroup").addEventListener("click", async (e)=>{
       showToast("Couldn't delete — check your connection and try again");
       return;
     }
-    if(date === document.getElementById("dateInput").value) renderPlateGroup();
+    if(date === getSelectedDate()) renderPlateGroup();
     renderHistory();
     showToast("Entry deleted");
+  }
+
+  if(actionEl.dataset.action === "reassign"){
+    const row = actionEl.closest(".history-row");
+    const date = row.dataset.date, plate = row.dataset.plate;
+    const dayLog = data.logs[date] || {};
+    const disabled = new Set(
+      Object.keys(dayLog).filter(p=>p!==plate).map(p=>dayLog[p]).filter(Boolean)
+    );
+    openDriverPicker({
+      selected: dayLog[plate] || "",
+      disabledDrivers: disabled,
+      includeUnassigned: false,
+      onPick: async (newDriver)=>{
+        if(!newDriver || newDriver === dayLog[plate]) return;
+        const previousDriver = dayLog[plate];
+        data.logs[date] = { ...dayLog, [plate]: newDriver };
+        const ok = await persist();
+        if(!ok){
+          data.logs[date][plate] = previousDriver;
+          showToast("Couldn't save — check your connection and try again");
+          return;
+        }
+        showToast(`${plate} on ${date} reassigned to ${newDriver}`);
+        if(date === getSelectedDate()) renderPlateGroup();
+        renderHistory();
+      }
+    });
   }
 });
 
@@ -721,32 +999,6 @@ document.getElementById("historyGroup").addEventListener("change", async (e)=>{
         showToast("Couldn't save the note — check your connection and try again");
       }
     }
-  }
-  if(e.target.dataset.action === "reassign"){
-    const row = e.target.closest(".history-row");
-    const date = row.dataset.date, plate = row.dataset.plate;
-    const newDriver = e.target.value;
-    const dayLog = data.logs[date] || {};
-    const previousDriver = dayLog[plate];
-
-    const alreadyOnAnotherLorry = Object.keys(dayLog).some(p => p !== plate && dayLog[p] === newDriver);
-    if(alreadyOnAnotherLorry){
-      e.target.value = previousDriver;
-      showToast(`${newDriver} is already on another lorry that day`);
-      return;
-    }
-
-    data.logs[date] = { ...dayLog, [plate]: newDriver };
-    const ok = await persist();
-    if(!ok){
-      data.logs[date][plate] = previousDriver;
-      e.target.value = previousDriver;
-      showToast("Couldn't save — check your connection and try again");
-      return;
-    }
-    showToast(`${plate} on ${date} reassigned to ${newDriver}`);
-    if(date === document.getElementById("dateInput").value) renderPlateGroup();
-    renderHistory();
   }
 });
 
@@ -807,10 +1059,8 @@ function populateFilters(){
 }
 
 document.getElementById("saveBtn").addEventListener("click", saveDay);
-document.getElementById("dateInput").addEventListener("change", renderPlateGroup);
 document.getElementById("todayBtn").addEventListener("click", ()=>{
-  document.getElementById("dateInput").value = todayStr();
-  renderPlateGroup();
+  setSelectedDate(todayStr());
 });
 ["filterPlate","filterDriver","filterFineOnly"].forEach(id=>{
   document.getElementById(id).addEventListener("change", renderHistory);
@@ -982,7 +1232,8 @@ if(isIOSDevice()){
 }
 
 (async function init(){
-  document.getElementById("dateInput").value = todayStr();
+  selectedDate = todayStr();
+  document.getElementById("dateBtn").textContent = formatDateDisplay(selectedDate);
   populateFilters();
   await loadData();
   renderPlateGroup();
