@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Fleet Log</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#007aff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Fleet Log">
 <style>
   :root{
     --bg:#f2f2f7;
@@ -48,6 +55,10 @@
     max-width:600px;
     margin:0 auto;
     padding:6px 16px 12px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
   }
   .eyebrow{
     font-size:13px;
@@ -61,6 +72,27 @@
     letter-spacing:-0.4px;
     margin:0;
   }
+  .sync-dot-btn{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    background:var(--card-2);
+    border:none;
+    border-radius:20px;
+    padding:7px 12px 7px 10px;
+    font-size:13px;
+    color:var(--secondary-label);
+    flex-shrink:0;
+  }
+  .sync-dot{
+    width:8px; height:8px;
+    border-radius:50%;
+    background:var(--tertiary-label);
+    flex-shrink:0;
+  }
+  .sync-dot.ok{background:var(--green);}
+  .sync-dot.err{background:var(--red);}
+  .sync-dot.busy{background:var(--yellow);}
 
   .section-header{
     font-size:13px;
@@ -114,11 +146,6 @@
     font-size:17px;
     font-weight:400;
     color:var(--label);
-  }
-  .row-caption{
-    font-size:13px;
-    color:var(--secondary-label);
-    margin-top:1px;
   }
 
   .value-select{
@@ -177,6 +204,14 @@
     cursor:pointer;
   }
   .action-btn:active{opacity:0.7;}
+  .action-btn.secondary{
+    background:var(--card-2);
+    color:var(--blue);
+  }
+  .action-btn.danger{
+    background:var(--card-2);
+    color:var(--red);
+  }
   .save-status{
     text-align:center;
     font-size:13px;
@@ -275,7 +310,7 @@
   }
   .delete-btn:active{opacity:0.6; background:rgba(255,59,48,0.14);}
 
-  .note-input{
+  .note-input, .text-input{
     width:100%;
     background:var(--card-2);
     border:none;
@@ -284,9 +319,9 @@
     font-family:inherit;
     padding:9px 10px;
     border-radius:8px;
-    margin-top:8px;
   }
-  .note-input::placeholder{color:var(--tertiary-label);}
+  .note-input{margin-top:8px;}
+  .note-input::placeholder, .text-input::placeholder{color:var(--tertiary-label);}
 
   .history-row{
     display:flex;
@@ -334,6 +369,25 @@
     font-size:15px;
   }
 
+  .field-row{
+    display:flex;
+    flex-direction:column;
+    padding:12px 16px;
+    gap:6px;
+    border-bottom:0.5px solid var(--sep);
+  }
+  .field-row:last-child{border-bottom:none;}
+  .field-label{
+    font-size:13px;
+    color:var(--secondary-label);
+  }
+  details.sync-details{margin-top:2px;}
+  details.sync-details summary{
+    list-style:none;
+    cursor:pointer;
+  }
+  details.sync-details summary::-webkit-details-marker{display:none;}
+
   .menu-btn{
     width:34px; height:34px;
     border-radius:50%;
@@ -377,6 +431,7 @@
     padding:16px;
     font-size:17px;
     color:var(--blue);
+    text-align:left;
   }
   .sheet-btn:last-child{border-bottom:none;}
   .sheet-btn.danger{color:var(--red);}
@@ -406,11 +461,12 @@
 <body>
 <div class="navbar">
   <div class="navbar-inner">
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-      <div>
-        <div class="eyebrow">4 lorries · 4 drivers · this phone only</div>
-        <h1>Fleet Log</h1>
-      </div>
+    <div>
+      <div class="eyebrow">4 lorries · 4 drivers</div>
+      <h1>Fleet Log</h1>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <button class="sync-dot-btn" id="syncStatusBtn"><span class="sync-dot" id="syncDot"></span><span id="syncLabel">Local only</span></button>
       <button class="menu-btn" id="menuBtn" aria-label="Menu">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="4" cy="10" r="1.6" fill="#007aff"/><circle cx="10" cy="10" r="1.6" fill="#007aff"/><circle cx="16" cy="10" r="1.6" fill="#007aff"/></svg>
       </button>
@@ -459,7 +515,48 @@
   <div class="group" id="historyGroup">
     <div class="loading">Loading log…</div>
   </div>
-  <div class="section-footer">Tap "Flag fine" on an entry to mark it and add a note. Tap a driver's name to reassign that day. Data stays on this phone only.</div>
+  <div class="section-footer">Tap a driver's name to reassign that day. Tap "Flag fine" to mark an entry and add a note.</div>
+
+  <div class="section-header" id="syncSectionHeader">Sync Across Devices</div>
+  <div class="group" id="syncGroup">
+    <details class="sync-details" id="syncDetails">
+      <summary>
+        <div class="row" id="syncSummaryRow">
+          <div class="row-title" style="font-size:15px;" id="syncSummaryText">Not connected — data stays on this phone only</div>
+          <span style="color:var(--blue); font-size:15px;">Set up</span>
+        </div>
+      </summary>
+      <div class="field-row">
+        <span class="field-label">GitHub repo (owner/repo)</span>
+        <input type="text" class="text-input" id="ghRepo" placeholder="e.g. kumar-tan/fleet-log-data" autocapitalize="off" autocorrect="off" spellcheck="false">
+      </div>
+      <div class="field-row">
+        <span class="field-label">Data file path in that repo</span>
+        <input type="text" class="text-input" id="ghPath" placeholder="fleet-data.json" autocapitalize="off" autocorrect="off" spellcheck="false">
+      </div>
+      <div class="field-row">
+        <span class="field-label">Personal access token (repo scope, or fine-grained with Contents read/write on this repo)</span>
+        <input type="password" class="text-input" id="ghToken" placeholder="ghp_…" autocapitalize="off" autocorrect="off" spellcheck="false">
+      </div>
+      <div class="field-row">
+        <button class="action-btn" id="ghConnectBtn" style="margin-top:0;">Connect & Sync</button>
+        <button class="action-btn danger" id="ghDisconnectBtn" style="display:none;">Disconnect This Device</button>
+      </div>
+    </details>
+  </div>
+  <div class="section-footer" id="syncFooter">Enter the same repo, file path, and a token on every phone to keep everyone's entries in sync. Each phone needs its own token entered once.</div>
+
+  <div class="section-header" id="driverLinkHeader" style="display:none;">Driver Live View</div>
+  <div class="group" id="driverLinkGroup" style="display:none;">
+    <div class="field-row">
+      <span class="field-label">Send this link to drivers — no login needed, updates live</span>
+      <input type="text" class="text-input" id="driverLinkText" readonly>
+    </div>
+    <div class="field-row">
+      <button class="action-btn secondary" id="copyDriverLinkBtn" style="margin-top:0;">Copy Link</button>
+    </div>
+  </div>
+  <div class="section-footer" id="driverLinkFooter" style="display:none;">Works instantly if the data repo is Public. If it's Private, drivers would each need a token too — ask if you want that version instead.</div>
 
 </div>
 
@@ -467,7 +564,7 @@
 <div class="action-sheet" id="actionSheet" style="display:none;">
   <div class="sheet-group">
     <button class="sheet-btn" id="exportBackupBtn">Export Backup (.json)<span class="sheet-sub">Full copy of all records — save this somewhere safe</span></button>
-    <button class="sheet-btn" id="importBackupBtn">Import Backup (.json)<span class="sheet-sub">Replaces everything on this phone with the file you pick</span></button>
+    <button class="sheet-btn" id="importBackupBtn">Import Backup (.json)<span class="sheet-sub">Replaces the log with the file you pick, then syncs it</span></button>
     <button class="sheet-btn" id="exportCsvBtn">Export Log (.csv)<span class="sheet-sub">Readable spreadsheet — date, lorry, driver, fine, note</span></button>
     <button class="sheet-btn danger" id="clearDataBtn">Clear All Data</button>
   </div>
@@ -481,32 +578,185 @@
 const PLATES = ["GBH 218 Z","YR 1868 R","YR 1859 S","YR 2284 T"];
 const DRIVERS = ["Kumar","Seng","Lim","Vetri"];
 const STORAGE_KEY = "fleet-data";
+const GH_SETTINGS_KEY = "fleet-gh-settings";
 let data = { logs:{}, fines:{} };
+let ghSha = null; // sha of the remote file, needed to update it
 
 function todayStr(){
   const d = new Date();
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 }
 
-async function loadData(){
+/* ---------- local cache (fast, always-on fallback) ---------- */
+
+function loadLocalCache(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw){
       const parsed = JSON.parse(raw);
       data = { logs: parsed.logs || {}, fines: parsed.fines || {} };
     }
-  }catch(e){ console.error("Fleet Log: couldn't read saved data", e); }
+  }catch(e){ console.error("Fleet Log: couldn't read local cache", e); }
 }
 
-async function persist(){
+function saveLocalCache(){
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    return true;
+  }catch(e){ console.error("Fleet Log: couldn't write local cache", e); }
+}
+
+/* ---------- GitHub sync settings ---------- */
+
+function getGhSettings(){
+  try{
+    const raw = localStorage.getItem(GH_SETTINGS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+
+function saveGhSettings(settings){
+  localStorage.setItem(GH_SETTINGS_KEY, JSON.stringify(settings));
+}
+
+function clearGhSettings(){
+  localStorage.removeItem(GH_SETTINGS_KEY);
+}
+
+function isGhConfigured(){
+  const s = getGhSettings();
+  return !!(s && s.owner && s.repo && s.path && s.token);
+}
+
+/* ---------- base64 helpers (UTF-8 safe, for Chinese notes etc) ---------- */
+
+function utf8ToBase64(str){
+  const bytes = new TextEncoder().encode(str);
+  let binary = "";
+  bytes.forEach(b => binary += String.fromCharCode(b));
+  return btoa(binary);
+}
+function base64ToUtf8(b64){
+  const binary = atob(b64.replace(/\n/g, ""));
+  const bytes = new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+/* ---------- GitHub Contents API ---------- */
+
+async function ghFetchFile(){
+  const s = getGhSettings();
+  const url = `https://api.github.com/repos/${s.owner}/${s.repo}/contents/${encodeURIComponent(s.path)}`;
+  const res = await fetch(url, {
+    headers: {
+      "Authorization": `token ${s.token}`,
+      "Accept": "application/vnd.github+json"
+    }
+  });
+  if(res.status === 404) return { data: null, sha: null };
+  if(res.status === 401 || res.status === 403) throw { authError: true, status: res.status };
+  if(!res.ok) throw new Error("GitHub read failed: " + res.status);
+  const json = await res.json();
+  const text = base64ToUtf8(json.content);
+  return { data: JSON.parse(text), sha: json.sha };
+}
+
+async function ghWriteFile(dataObj, sha){
+  const s = getGhSettings();
+  const url = `https://api.github.com/repos/${s.owner}/${s.repo}/contents/${encodeURIComponent(s.path)}`;
+  const body = {
+    message: `Fleet Log update ${new Date().toISOString()}`,
+    content: utf8ToBase64(JSON.stringify(dataObj, null, 2))
+  };
+  if(sha) body.sha = sha;
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Authorization": `token ${s.token}`,
+      "Accept": "application/vnd.github+json",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+  if(res.status === 409) throw { conflict: true };
+  if(res.status === 401 || res.status === 403) throw { authError: true, status: res.status };
+  if(!res.ok) throw new Error("GitHub write failed: " + res.status);
+  const json = await res.json();
+  return json.content.sha;
+}
+
+/* ---------- sync status indicator ---------- */
+
+function setSyncStatus(state, label){
+  // state: 'off' | 'ok' | 'busy' | 'err'
+  const dot = document.getElementById("syncDot");
+  dot.className = "sync-dot" + (state === "off" ? "" : " " + state);
+  document.getElementById("syncLabel").textContent = label;
+}
+
+/* ---------- unified data load / save ---------- */
+
+async function loadData(){
+  loadLocalCache();
+  if(!isGhConfigured()){
+    setSyncStatus("off", "Local only");
+    return;
+  }
+  setSyncStatus("busy", "Syncing…");
+  try{
+    const remote = await ghFetchFile();
+    if(remote.data){
+      data = { logs: remote.data.logs || {}, fines: remote.data.fines || {} };
+      ghSha = remote.sha;
+      saveLocalCache();
+    }else{
+      // repo file doesn't exist yet — push current local data as the first version
+      ghSha = await ghWriteFile(data, null);
+    }
+    setSyncStatus("ok", "Synced");
   }catch(e){
-    console.error("Fleet Log: couldn't save", e);
-    return false;
+    console.error("Fleet Log: initial sync failed", e);
+    if(e && e.authError){
+      setSyncStatus("err", "Sync error — check token");
+    }else{
+      setSyncStatus("err", "Offline — showing last synced copy");
+    }
   }
 }
+
+// returns { ok: boolean, conflict: boolean }
+async function persist(){
+  saveLocalCache();
+  if(!isGhConfigured()) return { ok: true, conflict: false };
+
+  setSyncStatus("busy", "Syncing…");
+  try{
+    ghSha = await ghWriteFile(data, ghSha);
+    setSyncStatus("ok", "Synced");
+    return { ok: true, conflict: false };
+  }catch(e){
+    if(e && e.conflict){
+      // someone else saved first — pull their version as the source of truth
+      try{
+        const remote = await ghFetchFile();
+        data = { logs: remote.data.logs || {}, fines: remote.data.fines || {} };
+        ghSha = remote.sha;
+        saveLocalCache();
+      }catch(e2){ /* fall through to generic error */ }
+      setSyncStatus("err", "Someone else saved first");
+      return { ok: false, conflict: true };
+    }
+    console.error("Fleet Log: sync write failed", e);
+    if(e && e.authError){
+      setSyncStatus("err", "Sync error — check token");
+    }else{
+      setSyncStatus("err", "Offline — saved on this phone only");
+    }
+    return { ok: false, conflict: false };
+  }
+}
+
+/* ---------- assignment grid ---------- */
 
 function driverOptionsHTML(selected, takenByOthers){
   let html = `<option value="">Not assigned</option>`;
@@ -581,18 +831,24 @@ async function saveDay(){
   data.logs[dateVal] = entry;
   status.textContent = "Saving…";
   status.className = "save-status";
-  const ok = await persist();
-  if(ok){
+  const result = await persist();
+  if(result.ok){
     status.textContent = `Saved for ${dateVal}`;
     status.className = "save-status";
+  }else if(result.conflict){
+    status.textContent = "Someone else saved a change first — pulling their latest, please redo your edit";
+    status.className = "save-status err";
+    renderPlateGroup();
   }else{
     if(previousEntry === undefined) delete data.logs[dateVal];
     else data.logs[dateVal] = previousEntry;
-    status.textContent = "Couldn't save — check your connection and try again";
+    status.textContent = "Couldn't sync — saved on this phone only. Try again when back online.";
     status.className = "save-status err";
   }
   renderHistory();
 }
+
+/* ---------- history / log book ---------- */
 
 function fineKey(date, plate){ return date + "|" + plate; }
 
@@ -664,10 +920,14 @@ document.getElementById("historyGroup").addEventListener("click", async (e)=>{
     const hadFine = !!data.fines[fk];
     if(hadFine) delete data.fines[fk];
     else data.fines[fk] = { note: "" };
-    const ok = await persist();
-    if(!ok){
-      if(hadFine) data.fines[fk] = { note: "" }; else delete data.fines[fk];
-      showToast("Couldn't save — check your connection and try again");
+    const result = await persist();
+    if(!result.ok){
+      if(result.conflict){
+        showToast("Someone else changed the log — pulled their latest");
+      }else{
+        if(hadFine) data.fines[fk] = { note: "" }; else delete data.fines[fk];
+        showToast("Couldn't sync — check your connection and try again");
+      }
     }
     renderHistory();
   }
@@ -685,8 +945,14 @@ document.getElementById("historyGroup").addEventListener("click", async (e)=>{
     if(data.logs[date]) delete data.logs[date][plate];
     delete data.fines[fk];
 
-    const ok = await persist();
-    if(!ok){
+    const result = await persist();
+    if(!result.ok){
+      if(result.conflict){
+        showToast("Someone else changed the log — pulled their latest, please redo this");
+        renderPlateGroup();
+        renderHistory();
+        return;
+      }
       if(previousDriver !== undefined){
         data.logs[date] = data.logs[date] || {};
         data.logs[date][plate] = previousDriver;
@@ -708,11 +974,16 @@ document.getElementById("historyGroup").addEventListener("change", async (e)=>{
     if(data.fines[fk]){
       const previousNote = data.fines[fk].note;
       data.fines[fk].note = e.target.value;
-      const ok = await persist();
-      if(!ok){
-        data.fines[fk].note = previousNote;
-        e.target.value = previousNote;
-        showToast("Couldn't save the note — check your connection and try again");
+      const result = await persist();
+      if(!result.ok){
+        if(result.conflict){
+          showToast("Someone else changed the log — pulled their latest");
+          renderHistory();
+        }else{
+          data.fines[fk].note = previousNote;
+          e.target.value = previousNote;
+          showToast("Couldn't sync the note — check your connection and try again");
+        }
       }
     }
   }
@@ -731,11 +1002,17 @@ document.getElementById("historyGroup").addEventListener("change", async (e)=>{
     }
 
     data.logs[date] = { ...dayLog, [plate]: newDriver };
-    const ok = await persist();
-    if(!ok){
-      data.logs[date][plate] = previousDriver;
-      e.target.value = previousDriver;
-      showToast("Couldn't save — check your connection and try again");
+    const result = await persist();
+    if(!result.ok){
+      if(result.conflict){
+        showToast("Someone else changed the log — pulled their latest, please redo this");
+        renderPlateGroup();
+        renderHistory();
+      }else{
+        data.logs[date][plate] = previousDriver;
+        e.target.value = previousDriver;
+        showToast("Couldn't sync — check your connection and try again");
+      }
       return;
     }
     showToast(`${plate} on ${date} reassigned to ${newDriver}`);
@@ -800,6 +1077,108 @@ function populateFilters(){
   });
 }
 
+/* ---------- GitHub sync settings UI ---------- */
+
+function renderSyncSummary(){
+  const s = getGhSettings();
+  const summaryText = document.getElementById("syncSummaryText");
+  const disconnectBtn = document.getElementById("ghDisconnectBtn");
+  const linkHeader = document.getElementById("driverLinkHeader");
+  const linkGroup = document.getElementById("driverLinkGroup");
+  const linkFooter = document.getElementById("driverLinkFooter");
+  if(s && s.owner && s.repo){
+    summaryText.textContent = `Connected — ${s.owner}/${s.repo}`;
+    disconnectBtn.style.display = "block";
+    document.getElementById("ghRepo").value = `${s.owner}/${s.repo}`;
+    document.getElementById("ghPath").value = s.path;
+
+    const base = location.href.replace(/index\.html.*$/, "").replace(/\?.*$/, "");
+    const params = new URLSearchParams({ owner: s.owner, repo: s.repo, path: s.path });
+    document.getElementById("driverLinkText").value = base + "driver-view.html?" + params.toString();
+    linkHeader.style.display = "block";
+    linkGroup.style.display = "block";
+    linkFooter.style.display = "block";
+  }else{
+    summaryText.textContent = "Not connected — data stays on this phone only";
+    disconnectBtn.style.display = "none";
+    linkHeader.style.display = "none";
+    linkGroup.style.display = "none";
+    linkFooter.style.display = "none";
+  }
+}
+
+document.getElementById("copyDriverLinkBtn").addEventListener("click", async ()=>{
+  const text = document.getElementById("driverLinkText").value;
+  try{
+    await navigator.clipboard.writeText(text);
+    showToast("Link copied — share it with your drivers");
+  }catch(e){
+    showToast("Couldn't copy automatically — select and copy the link manually");
+  }
+});
+
+document.getElementById("ghConnectBtn").addEventListener("click", async ()=>{
+  const repoRaw = document.getElementById("ghRepo").value.trim();
+  const path = document.getElementById("ghPath").value.trim() || "fleet-data.json";
+  const token = document.getElementById("ghToken").value.trim();
+  const btn = document.getElementById("ghConnectBtn");
+
+  const parts = repoRaw.split("/").map(p=>p.trim()).filter(Boolean);
+  if(parts.length !== 2 || !token){
+    showToast("Enter repo as owner/repo, plus a token");
+    return;
+  }
+  const [owner, repo] = parts;
+
+  btn.textContent = "Connecting…";
+  saveGhSettings({ owner, repo, path, token });
+
+  try{
+    const remote = await ghFetchFile();
+    if(remote.data){
+      data = { logs: remote.data.logs || {}, fines: remote.data.fines || {} };
+      ghSha = remote.sha;
+    }else{
+      ghSha = await ghWriteFile(data, null);
+    }
+    saveLocalCache();
+    setSyncStatus("ok", "Synced");
+    showToast("Connected — synced with GitHub");
+    document.getElementById("ghToken").value = "";
+    document.getElementById("syncDetails").open = false;
+  }catch(e){
+    console.error("Fleet Log: connect failed", e);
+    clearGhSettings();
+    if(e && e.authError){
+      showToast("Couldn't connect — check the token's permissions");
+    }else{
+      showToast("Couldn't connect — check the repo name and your connection");
+    }
+    setSyncStatus("off", "Local only");
+  }
+  btn.textContent = "Connect & Sync";
+  renderSyncSummary();
+  renderPlateGroup();
+  renderHistory();
+});
+
+document.getElementById("ghDisconnectBtn").addEventListener("click", ()=>{
+  clearGhSettings();
+  ghSha = null;
+  document.getElementById("ghToken").value = "";
+  document.getElementById("ghRepo").value = "";
+  document.getElementById("ghPath").value = "";
+  setSyncStatus("off", "Local only");
+  renderSyncSummary();
+  showToast("Disconnected — this phone now keeps its own local copy");
+});
+document.getElementById("syncStatusBtn").addEventListener("click", ()=>{
+  document.getElementById("syncDetails").open = true;
+  document.getElementById("syncDetails").scrollIntoView({behavior:"smooth", block:"start"});
+});
+
+/* ---------- wiring ---------- */
+
 document.getElementById("saveBtn").addEventListener("click", saveDay);
 document.getElementById("dateInput").addEventListener("change", renderPlateGroup);
 document.getElementById("todayBtn").addEventListener("click", ()=>{
@@ -809,6 +1188,12 @@ document.getElementById("todayBtn").addEventListener("click", ()=>{
 ["filterPlate","filterDriver","filterFineOnly"].forEach(id=>{
   document.getElementById(id).addEventListener("change", renderHistory);
 });
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("sw.js").catch(()=>{ /* offline shell just won't be available */ });
+  });
+}
 
 /* ---------- menu / action sheet ---------- */
 
@@ -859,14 +1244,22 @@ document.getElementById("importFileInput").addEventListener("change", async (e)=
       showToast("That file doesn't look like a Fleet Log backup");
       return;
     }
-    const confirmed = await showConfirm("This will replace everything currently on this phone with the backup file. Continue?", "Replace");
+    const confirmed = await showConfirm(isGhConfigured()
+      ? "This will replace everything currently in the synced log (for all phones) with the backup file. Continue?"
+      : "This will replace everything currently on this phone with the backup file. Continue?", "Replace");
     if(!confirmed) return;
     const previous = data;
     data = { logs: parsed.logs || {}, fines: parsed.fines || {} };
-    const ok = await persist();
-    if(!ok){
-      data = previous;
-      showToast("Couldn't save the imported data — try again");
+    const result = await persist();
+    if(!result.ok){
+      if(result.conflict){
+        showToast("Someone else changed the log first — try importing again");
+      }else{
+        data = previous;
+        showToast("Couldn't save the imported data — try again");
+      }
+      renderPlateGroup();
+      renderHistory();
       return;
     }
     renderPlateGroup();
@@ -892,14 +1285,22 @@ document.getElementById("exportCsvBtn").addEventListener("click", ()=>{
 
 document.getElementById("clearDataBtn").addEventListener("click", async ()=>{
   closeSheet();
-  const confirmed = await showConfirm("This deletes every saved assignment and fine on this phone. This can't be undone — export a backup first if you're not sure. Continue?", "Clear Everything");
+  const confirmed = await showConfirm(isGhConfigured()
+    ? "This deletes every saved assignment and fine — for every phone synced to this repo. This can't be undone — export a backup first if you're not sure. Continue?"
+    : "This deletes every saved assignment and fine on this phone. This can't be undone — export a backup first if you're not sure. Continue?", "Clear Everything");
   if(!confirmed) return;
   const previous = data;
   data = { logs:{}, fines:{} };
-  const ok = await persist();
-  if(!ok){
-    data = previous;
-    showToast("Couldn't clear data — try again");
+  const result = await persist();
+  if(!result.ok){
+    if(result.conflict){
+      showToast("Someone else changed the log first — try again");
+    }else{
+      data = previous;
+      showToast("Couldn't clear data — try again");
+    }
+    renderPlateGroup();
+    renderHistory();
     return;
   }
   renderPlateGroup();
@@ -910,6 +1311,7 @@ document.getElementById("clearDataBtn").addEventListener("click", async ()=>{
 (async function init(){
   document.getElementById("dateInput").value = todayStr();
   populateFilters();
+  renderSyncSummary();
   await loadData();
   renderPlateGroup();
   renderHistory();
