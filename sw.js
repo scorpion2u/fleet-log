@@ -1,4 +1,4 @@
-const CACHE_NAME = "fleet-log-shell-v6";
+const CACHE_NAME = "fleet-log-shell-v7";
 const SHELL_FILES = [
   "./",
   "./index.html",
