@@ -1,10 +1,12 @@
-const CACHE_NAME = "fleet-log-shell-v7";
+const CACHE_NAME = "fleet-log-shell-v8";
 const SHELL_FILES = [
   "./",
   "./index.html",
   "./driver-view.html",
+  "./fleet-log-local.html",
   "./manifest.json",
   "./manifest-driver.json",
+  "./manifest-local.json",
   "./icon-192.png",
   "./icon-512.png",
   "./apple-touch-icon.png"
